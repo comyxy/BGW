@@ -31,8 +31,27 @@
 ### 说一下AOP？
 
 Aspect Oriented Programming，面向切片编程，将一些与主业务逻辑无关的业务（如日志管理、信息统计）从主业务中拿出来做成切面，在需要这些业务逻辑的时候通过切片织入的方式插入主业务逻辑中。代码层面上解除了两者的耦合关系，可以充分复用切片代码。  
-实现方式上，通过JDK动态代理或 cglib 的字节码继承技术，将原业务替换为代理对象，执行相应业务。
+实现方式上，通过JDK动态代理或 CGLIB 的字节码继承技术，将原业务替换为代理对象，执行相应业务。
+
+### Spring单例Bean的循环依赖问题
+
+<https://www.cnblogs.com/daimzh/p/13256413.html>
+
+* Spring创建一个Bean的过程
+
+  实例化createBeanInstance(new一个对象) --> 属性注入populateBean(set对象上属性) -->  初始化initializeBean(执行aware接口以及完成AOP代理)
+
+* Spring中IOC容器如何存储单例Bean
+
+  三级缓存，包括`singletonObjects`(一级缓存 已经创建好的单例Bean对象) `earlySingletonObjects`(二级缓存 实例化但是还未属性注入和初始化的单例Bean对象) `singletonFactorries`(三级缓存 实例化单例Bean对象的工厂)
   
+* Spring如何解决的循环依赖问题
+
+  Spring通过三级缓存解决了循环依赖，其中一级缓存为单例池`singletonObjects`,二级缓存为早期曝光对象`earlySingletonObjects`，三级缓存为早期曝光对象工厂`singletonFactories`。  
+  当A、B两个类发生循环引用时，在A完成实例化后，就使用实例化后的对象去创建一个对象工厂，并添加到三级缓存中，如果A被AOP代理，那么通过这个工厂获取到的就是A代理后的对象；如果A没有被AOP代理，那么这个工厂获取到的就是A实例化的对象。当A进行属性注入时，会去创建B，同时B又依赖了A，所以创建B的同时又会去调用`getBean(A)`来获取需要的依赖，此时的`getBean(A)`会从缓存中获取，第一步，先获取到三级缓存中的工厂；第二步，调用对象工工厂的getObject方法来获取到对应的对象，得到这个对象后将其注入到B中。紧接着B会走完它的生命周期流程，包括初始化、后置处理器等。当B创建完后，会将B再注入到A中，此时A再完成它的整个生命周期。
+
+  ![Spring循环依赖问题](pic/Spring循环依赖问题.png)
+
 ### 说一下 IoC 和 DI？
 
 Inverse of Control，控制反转，是一种设计思想，即将创建对象的操作由**使用对象者**交给 **Spring 框架**来管理，同时，对象间复杂的依赖关系也交给了 Spring 框架管理。当需要某个对象时，使用者只需向 Spring 框架请求这个对象，就可以获得一个已经创建好的对象，这个过程就是 Dependency Injection，即 Spring 框架将创建好的对象按一定匹配规则注入给使用者的过程。这样一来，对象使用者就不需要知道对象是如何被创建出来的，当对象修改时，只需要关心对象本身的修改，而不必担心使用对象的类会被牵一发而动全身。这种低侵入的特定，提高了项目的可维护性，降低了开发难度。
